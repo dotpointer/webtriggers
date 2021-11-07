@@ -15,8 +15,8 @@ define('STATUS_ENDED', 2);
 define('STATUS_ABORTED', 3);
 
 $statuses = array(
-  STATUS_ERROR_TRIGGER_NOT_CONFIGURED => 'Error - Trigger not found in config file',
-  STATUS_ERROR_BAD_EXIT_CODE => 'Error - Execution did not end with 0',
+  STATUS_ERROR_TRIGGER_NOT_CONFIGURED => 'Error, not found in configuration file',
+  STATUS_ERROR_BAD_EXIT_CODE => 'Error, bad exit code',
   STATUS_QUEUED => 'Queued',
   STATUS_STARTED => 'Started',
   STATUS_ENDED => 'Ended',
@@ -42,7 +42,7 @@ if (!file_exists(dirname(__FILE__).'/setup.php')) {
 
 require_once('setup.php');
 require_once('base3.php');
-# require_once('base.translate.php');
+require_once('base.translate.php');
 
 $verbosity_cli = VERBOSITY_CLI;
 
