@@ -1,0 +1,47 @@
+h1 a, h1 a:visited {
+  color: #000;
+  text-decoration: none;
+}
+
+table {
+  width: 100%;
+  border: 1px solid #000;
+  border-collapse:collapse;
+}
+
+tr, td, th {
+  border: 1px solid #000;
+}
+
+table caption {
+  text-align: left;
+  font-weight: bold;
+}
+button {
+  font-weight: bold;
+  padding: 3px auto;
+  width: 100%;
+}
+
+@media only screen and (min-device-width: 320px) and (max-device-width: 480px), only screen and (min-device-width : 480px) and (max-device-width : 800px), only screen and (max-width: 500px) {
+  body, button {
+    font-size: 40px;
+  }
+
+  button {
+    padding: 30px 45px;
+    background-color: #f0f0f0;
+  }
+
+  table {
+    border: 2px solid #000;
+  }
+
+  tr, td, th {
+    border: 2px solid #000;
+  }
+
+  .extra {
+    display: none;
+  }
+}

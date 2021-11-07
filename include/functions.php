@@ -1,0 +1,157 @@
+<?php
+
+# changelog
+# 2021-11-07 02:48:00
+
+session_start();
+
+define('SITE_SHORTNAME', 'webtriggers');
+
+define('STATUS_ERROR_BAD_EXIT_CODE', -2);
+define('STATUS_ERROR_TRIGGER_NOT_CONFIGURED', -1);
+define('STATUS_QUEUED', 0);
+define('STATUS_STARTED', 1);
+define('STATUS_ENDED', 2);
+define('STATUS_ABORTED', 3);
+
+$statuses = array(
+  STATUS_ERROR_TRIGGER_NOT_CONFIGURED => 'Error - Trigger not found in config file',
+  STATUS_ERROR_BAD_EXIT_CODE => 'Error - Execution did not end with 0',
+  STATUS_QUEUED => 'Queued',
+  STATUS_STARTED => 'Started',
+  STATUS_ENDED => 'Ended',
+  STATUS_ABORTED => 'Aborted'
+);
+
+# verbosity
+define('VERBOSE_OFF', 0);               # no info at all
+define('VERBOSE_ERROR', 1);             # only errors
+define('VERBOSE_INFO', 2);              # above and things that changes
+define('VERBOSE_DEBUG', 3);             # above and verbose info
+define('VERBOSE_DEBUG_DEEP', 4);                # above and exec outputs
+
+if (!file_exists(dirname(__FILE__).'/setup.php')) {
+  header('Content-Type: text/plain');
+?>
+  Welcome. It appears that the setup file in include/setup.php is not present. Please go to the include
+  directory and copy the example file setup-example.php to setup.php. Then edit the setup.php to fit your
+  system setup. Thanks for using this software.
+<?php
+    die();
+}
+
+require_once('setup.php');
+require_once('base3.php');
+# require_once('base.translate.php');
+
+$verbosity_cli = VERBOSITY_CLI;
+
+$link = db_connect();
+# mysql_set_charset('utf8', $link);
+
+$errors = array();
+
+if (!function_exists('shutdown_function')) {
+  # a function to run when the script shutdown
+  function shutdown_function($link) {
+    if ($link) {
+      db_close($link);
+    }
+  }
+}
+
+# register a shutdown function
+register_shutdown_function('shutdown_function', $link);
+
+function check_setup_files() {
+
+  # check configuration file existence
+  if (!file_exists(CONFIGFILE)) {
+    if (php_sapi_name() != "cli") {
+      header('Content-Type: text/plain');
+    }
+    cl('Error, configuration file '.CONFIGFILE.' does not exist, please run runner.php -s.', VERBOSE_ERROR);
+    die(1);
+  }
+
+  # check configuration file ownership and permissions
+  if (!file_exists(CONFIGFILE) || fileowner(CONFIGFILE) !== 0 || substr(sprintf('%o', fileperms(CONFIGFILE)), -4) !== '0644') {
+    if (php_sapi_name() != "cli") {
+      header('Content-Type: text/plain');
+    }
+    cl('Error, configuration file '.CONFIGFILE.' must be owned by root and set to 644 (rw--r--r--).', VERBOSE_ERROR);
+    die(1);
+  }
+
+  if (!file_exists(TRIGGERFILE) || !is_writeable(TRIGGERFILE)) {
+    if (php_sapi_name() != "cli") {
+      header('Content-Type: text/plain');
+    }
+    cl('Error, trigger file '.TRIGGERFILE.' does not exist or is not writable, please run runner with the -s parameter.', VERBOSE_ERROR);
+    die(1);
+  }
+}
+
+# debug printing
+function cl($s, $level=VERBOSE_ERROR, $log_to_logfile=true) {
+
+  global $verbosity_cli;
+
+  # do not log passwords from mountcifs
+  $s = preg_replace('/password=\".*\" \"\/\//', 'password="*****" "//', $s);
+
+  # do not log passwords from lftpd
+  $s = preg_replace('/\-u .* \-e/', '-u *****,***** -e', $s);
+
+  # find out level of verbosity
+  switch ($level) {
+    case VERBOSE_ERROR:
+      $l = 'E';
+      break;
+    case VERBOSE_INFO:
+      $l = 'I';
+      break;
+    case VERBOSE_DEBUG:
+    case VERBOSE_DEBUG_DEEP:
+      $l = 'D';
+      break;
+  }
+  $s = ''.date('Y-m-d H:i:s').' '.$l.' '.$s."\n";
+
+  # is verbosity on and level is enough?
+  if ($verbosity_cli && $verbosity_cli >= $level) {
+    echo $s;
+  }
+
+  # is log level on and level is enough - the try to append to log
+  if ($log_to_logfile && VERBOSITY_LOGFILE && VERBOSITY_LOGFILE >= $level && $f = fopen(LOGFILE, 'a')) {
+    fwrite($f, $s);
+    fclose($f);
+  }
+
+  return true;
+}
+
+function get_actions() {
+  $actions = file_get_contents(CONFIGFILE);
+
+  # remove comments beginning with # in the file
+  $actions = explode("\n", $actions);
+  foreach ($actions as $k => $v) {
+    $actions[$k] = preg_replace('/^\s*\#+.*$/', '',$v);
+  }
+  $actions = implode("\n", $actions);
+
+  # decode the json
+  $actions = json_decode($actions, true);
+  if (json_last_error() !== JSON_ERROR_NONE) {
+    if (php_sapi_name() != "cli") {
+      header('Content-Type: text/plain');
+    }
+    cl('Error decoding JSON data in settings file '.CONFIGFILE.': '.json_last_error_msg(), VERBOSE_ERROR);
+    die(1);
+  }
+  return $actions;
+}
+
+?>
