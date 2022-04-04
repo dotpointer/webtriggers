@@ -23,9 +23,11 @@ $translations['languages'][] = array(
     array('Queue - latest', 'Kö - senaste'),
     array('Queued action', 'Köade händelse'),
     array('Queued', 'Köad'),
-    array('Queued', 'Köad'),
+    array('Output', 'Utdata'),
+    array('Return code', 'Returvärde'),
     array('Run', 'Kör'),
-    array('Start', 'Start')
+    array('Start', 'Start'),
+    array('Started', 'Påbörjad'),
   )
 );
 ?>

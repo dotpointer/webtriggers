@@ -118,7 +118,15 @@ foreach ($queue as $k => $v) {
 ?>
         <tr>
           <td><?php echo $action_index !== false ? $actions[$action_index]['name'] : ''; ?></td>
-          <td><?php echo t($statuses[$v['status']]); ?></td>
+          <td><?php
+            echo t($statuses[$v['status']]);
+            if ((int)$v['status'] < 0) {
+              ?><br><?php
+              echo t('Return code').': '.$v['returncode'];
+              ?><br><?php
+              echo t('Output').': '.$v['output'];
+            }
+        ?></td>
           <td class="extra"><?php echo $v['created']; ?></td>
           <td class="extra"><?php echo $v['started']; ?></td>
           <td class="extra"><?php echo $v['ended']; ?></td>
