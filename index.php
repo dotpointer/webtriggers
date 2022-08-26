@@ -11,10 +11,33 @@ check_setup_files();
 
 $actions = get_actions();
 
-$action = isset($_REQUEST['action']) ? $_REQUEST['action'] : false;
+$a = isset($_REQUEST['a']) ? $_REQUEST['a'] : false;
+$action = isset($_REQUEST['action']) ? $_REQUEST['action'] : $a;
+$format = isset($_REQUEST['format']) ? $_REQUEST['format'] : false;
 $id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : false;
 
 switch ($action) {
+  case 'list':
+
+    header('Content-Type: application/json');
+    $sql = 'SELECT * FROM webtrigger_orders ORDER BY created DESC LIMIT 10';
+    $queue = db_query($link, $sql);
+
+    foreach ($queue as $rowindex => $row) {
+      # to int
+      foreach (array('id', 'id_webtriggers', 'returncode', 'status') as $columnname) {
+        $queue[$rowindex][$columnname] = (int)$row[$columnname];
+      }
+    }
+
+    $queue = array_reverse($queue);
+
+    die(json_encode(array(
+      'status' => true,
+      'data' => $queue
+    )));
+
+    break;
   case 'trigger':
 
     $id_webtriggers = false;
@@ -33,7 +56,6 @@ switch ($action) {
       die(1);
     }
 
-    # insert packlist relation
     $iu = dbpia($link, array(
       'id_webtriggers' => $id_webtriggers,
       'created' => date('Y-m-d H:i:s')
@@ -42,6 +64,12 @@ switch ($action) {
     cl('SQL: '.$sql, VERBOSE_DEBUG_DEEP, false);
     $r_insert = db_query($link, $sql);
     file_put_contents(TRIGGERFILE, time());
+
+    if ($format === 'json') {
+      die(json_encode(array(
+        'status' => true
+      )));
+    }
     break;
 }
 
@@ -54,6 +82,17 @@ $queue = db_query($link, $sql);
     <title>Webtriggers</title>
     <meta http-equiv="Content-Type" content="text/html; charset=utf-8"/>
     <link rel="stylesheet" href="include/style.css" type="text/css" media="screen"/>
+    <script src="include/jquery-3.6.1.min.js"></script>
+    <script>
+      window.wt = window.wt == null ? {} : window.wt;
+      window.wt.actions = <?php echo json_encode($actions); ?>;
+      window.wt.msg = <?php echo json_encode(get_translation_texts(), true); ?>;
+      window.wt.statuses = <?php echo json_encode($statuses); ?>;
+      window.wt.timeouts = {
+        list: null
+      };
+    </script>
+    <script src="include/load.js"></script>
   </head>
   <body>
     <h1><a href="?">Webtriggers</a></h1>
@@ -94,7 +133,7 @@ foreach ($actions as $k => $action) {
 ?>
     </table>
     <br>
-    <table>
+    <table id="queue">
       <caption><?php echo t('Queue - latest').' '.count($queue) ?></caption>
       <thead>
         <tr class="header">
@@ -116,9 +155,9 @@ foreach ($queue as $k => $v) {
     }
   }
 ?>
-        <tr>
-          <td><?php echo $action_index !== false ? $actions[$action_index]['name'] : ''; ?></td>
-          <td><?php
+        <tr id="queuerow<?php echo $v['id']?>">
+          <td class="actionname"><?php echo $action_index !== false ? $actions[$action_index]['name'] : ''; ?></td>
+          <td class="status"><?php
             echo t($statuses[$v['status']]);
             if ((int)$v['status'] < 0) {
               ?><br><?php
@@ -127,14 +166,14 @@ foreach ($queue as $k => $v) {
               echo t('Output').': '.$v['output'];
             }
         ?></td>
-          <td class="extra"><?php echo $v['created']; ?></td>
-          <td class="extra"><?php echo $v['started']; ?></td>
-          <td class="extra"><?php echo $v['ended']; ?></td>
+          <td class="created extra"><?php echo $v['created']; ?></td>
+          <td class="started extra"><?php echo $v['started']; ?></td>
+          <td class="ended extra"><?php echo $v['ended']; ?></td>
         </tr>
-      </tbody>
 <?php
 }
 ?>
+      </tbody>
     </table>
   </body>
 </html>
