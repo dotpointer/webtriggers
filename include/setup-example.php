@@ -22,6 +22,10 @@ define('CONFIGFILE', '/etc/dptools/webtriggers');
 # log file location, set to false to disable
 define('LOGFILE', '/var/log/webtriggers');
 
+# order files path, set to false to disable
+define('ORDER_FILES_PATH', false);
+#define('ORDER_FILES_PATH', '/tmp/');
+
 # trigger file - must exist
 define('TRIGGERFILE', '/var/cache/webtriggers.trigger');
 ?>
