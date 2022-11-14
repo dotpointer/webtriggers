@@ -9,9 +9,9 @@ if (php_sapi_name() !== 'cli') {
   die();
 }
 
-require_once('include/functions.php');
+require_once(dirname(__FILE__).DIRECTORY_SEPARATOR.'include'.DIRECTORY_SEPARATOR.'functions.php');
 
-foreach (getopt('hl:pr:stv::', array(
+foreach (getopt('hl:pr:stuv::', array(
   'help', 'list-actions', 'list-orders', 'process-queue',
   'run:', 'run-order-file:', 'setup', 'verbose::'
 )) as $k => $v) {
@@ -57,6 +57,8 @@ Parameters:
                    files.
 
   -t               Get trigger file.
+
+  -u               Update trigger file to trigger queue processing.
 
   -v[vvv],         Show detailed information, must precede other parameters
   --verbose[vvv]   to take effect as they run in the order they are written,
@@ -387,6 +389,9 @@ Parameters:
     case 't':
       echo TRIGGERFILE;
       die();
+    case 'u':
+      file_put_contents(TRIGGERFILE, time());
+      break;
     case 'v': # be verbose
     case 'verbose':
       # determine and set level of verbosity

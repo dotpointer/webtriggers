@@ -3,9 +3,9 @@
 # changelog
 # 2021-11-07 02:48:00
 
-require_once('include/functions.php');
+require_once(dirname(__FILE__).DIRECTORY_SEPARATOR.'include'.DIRECTORY_SEPARATOR.'functions.php');
 
-start_translations(dirname(__FILE__).'/include/locales/');
+start_translations(dirname(__FILE__).DIRECTORY_SEPARATOR.'include'.DIRECTORY_SEPARATOR.'locales'.DIRECTORY_SEPARATOR);
 
 check_setup_files();
 

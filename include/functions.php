@@ -30,7 +30,7 @@ define('VERBOSE_INFO', 2);              # above and things that changes
 define('VERBOSE_DEBUG', 3);             # above and verbose info
 define('VERBOSE_DEBUG_DEEP', 4);                # above and exec outputs
 
-if (!file_exists(dirname(__FILE__).'/setup.php')) {
+if (!file_exists(dirname(__FILE__).DIRECTORY_SEPARATOR.'setup.php')) {
   header('Content-Type: text/plain');
 ?>
   Welcome. It appears that the setup file in include/setup.php is not present. Please go to the include
@@ -40,9 +40,9 @@ if (!file_exists(dirname(__FILE__).'/setup.php')) {
     die();
 }
 
-require_once('setup.php');
-require_once('base3.php');
-require_once('base.translate.php');
+require_once(dirname(__FILE__).DIRECTORY_SEPARATOR.'setup.php');
+require_once(dirname(__FILE__).DIRECTORY_SEPARATOR.'base3.php');
+require_once(dirname(__FILE__).DIRECTORY_SEPARATOR.'base.translate.php');
 
 $verbosity_cli = VERBOSITY_CLI;
 
