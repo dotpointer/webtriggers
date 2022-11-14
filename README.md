@@ -11,7 +11,7 @@ to trigger. The web page inserts an order to the database (webtriggers)
 with the action and updates the trigger file (var/cache/webtriggers.trigger).
 
 A file system watcher (onchange.sh) notes that the trigger file has changed
-and starts the runner file (runner.php). The runner file retrieves one order
+and starts the webtriggers file (webtriggers.php). The webtriggers file retrieves one order
 at a time and runs the action for that order.
 
 ## List of files
@@ -25,7 +25,7 @@ include/onchange.sh - File system watcher
 include/setup-example.php - Example file of database setup
 include/setup.php - Example file of database setup
 index.php - Web page to be visited by a web browser.
-runner.php - Order fetcher and action runner
+webtriggers.php - Order fetcher and action webtriggers
 watch.trigger.sh - File trigger starter
 
 ## Getting Started
@@ -40,16 +40,17 @@ What things you need to install the software and how to install them
 
 ```
 - Debian Linux 9 or similar system
-- nginx
+- inotify-tools
 - MariaDB (or MySQL)
+- nginx
 - PHP
 - PHP-FPM
 - PHP-MySQLi
 ```
 
-Setup the nginx web server with PHP-FPM support and MariaDB/MySQL.
+Setup the nginx web server with PHP-FPM support and MariaDB/MySQL and inotify-tools.
 
-In short: apt-get install nginx mariadb-server php-fpm php-mysqli
+In short: apt-get install nginx mariadb-server php-fpm php-mysqli inotify-tools
 and then configure nginx, PHP and setup a user in MariaDB.
 
 ### Installing
@@ -96,7 +97,7 @@ Run this to write a configuration file to /etc/dptools/webtriggers and
 trigger file to /var/cache/webtriggers.trigger:
 
 ```
-php runner.php -vs
+php webtriggers.php -vs
 ```
 
 Open the configuration file at /etc/dptools/webtriggers and setup your actions
@@ -109,7 +110,7 @@ start the watcher for the trigger file that is updated by the web interface:
 /bin/bash /<path-to-project-root-directory>/watch.trigger.sh
 ```
 
-The watcher calls runner.php which checks the database for orders to run when
+The watcher calls webtriggers.php which checks the database for orders to run when
 the trigger file is updated.
 
 ## Usage

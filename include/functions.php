@@ -70,7 +70,7 @@ function check_setup_files() {
     if (php_sapi_name() != "cli") {
       header('Content-Type: text/plain');
     }
-    cl('Error, configuration file '.CONFIGFILE.' does not exist, please run runner.php -s.', VERBOSE_ERROR);
+    cl('Error, configuration file '.CONFIGFILE.' does not exist, please run webtriggers.php -s.', VERBOSE_ERROR);
     die(1);
   }
 
@@ -87,7 +87,7 @@ function check_setup_files() {
     if (php_sapi_name() != "cli") {
       header('Content-Type: text/plain');
     }
-    cl('Error, trigger file '.TRIGGERFILE.' does not exist or is not writable, please run runner with the -s parameter.', VERBOSE_ERROR);
+    cl('Error, trigger file '.TRIGGERFILE.' does not exist or is not writable, please run webtriggers with the -s parameter.', VERBOSE_ERROR);
     die(1);
   }
 }
