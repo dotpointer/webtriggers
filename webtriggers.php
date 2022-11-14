@@ -11,9 +11,9 @@ if (php_sapi_name() !== 'cli') {
 
 require_once('include/functions.php');
 
-foreach (getopt('hl:r:stv::', array(
-  'help', 'list-actions', 'list-orders', 'run:',
-  'run-order-file:', 'setup', 'verbose::'
+foreach (getopt('hl:pr:stv::', array(
+  'help', 'list-actions', 'list-orders', 'process-queue',
+  'run:', 'run-order-file:', 'setup', 'verbose::'
 )) as $k => $v) {
   switch ($k) {
     case 'h':
@@ -29,6 +29,9 @@ Parameters:
 
   -lo,             List orders.
   --list-orders
+
+  -p,              Process queue, root is required.
+  --process-queue
 
   -r <action>,     Run action.
   --run <action>
@@ -112,6 +115,179 @@ Parameters:
         }
       } # eof list-orders
       die();
+
+    case 'p':
+    case 'process-queue':
+
+      $currentuser = posix_getpwuid(posix_geteuid());
+      $currentuser = $currentuser['name'];
+      if ($currentuser !== 'root') {
+        echo 'Root is required to process queue.'."\n";
+      }
+
+      function cmp($a, $b) {
+        if ($a['created'] == $b['created']) {
+          return 0;
+        }
+        return ($a['created'] < $b['created']) ? -1 : 1;
+      }
+
+      check_setup_files();
+
+      $actions = get_actions();
+
+      do {
+        cl('Checking for a queued order', VERBOSE_DEBUG);
+
+        # get one order
+        $sql = 'SELECT * FROM webtrigger_orders WHERE status='.STATUS_QUEUED.' ORDER BY created LIMIT 1';
+        cl('SQL: '.$sql, VERBOSE_DEBUG_DEEP);
+        $r = db_query($link, $sql);
+        cl('Rows: '.count($r), VERBOSE_DEBUG_DEEP);
+
+        if (ORDER_FILES_PATH !== false && dir(ORDER_FILES_PATH)) {
+
+          $files = scandir(ORDER_FILES_PATH);
+          if ($files === false) {
+            cl('Error, order files path could not be checked: '.ORDER_FILES_PATH, VERBOSE_ERROR);
+            die(1);
+          }
+
+          foreach ($files as $file) {
+
+            # webtriggers.order.id_webtriggers.tmpcode[.status]
+            if (strpos($file, 'webtriggers.order.') !== 0) continue;
+
+            $parts = explode('.', $file);
+            if (!is_numeric($parts[2]) ||
+              isset($parts[4]) && $parts[count($parts) - 1] !== 'queued'
+            ) {
+              continue;
+            }
+
+            array_pop($parts);
+
+            $r[] = array(
+              'id_webtriggers' => (int)$parts[2],
+              'created' => filemtime(ORDER_FILES_PATH.$file),
+              'file' => ORDER_FILES_PATH.$file,
+              'file_original' => ORDER_FILES_PATH.implode('.', $parts)
+            );
+          }
+          usort($r, "cmp");
+        }
+
+        if (count($r)) {
+
+          $file_order = isset($r[0]['file']);
+
+          if ($file_order) {
+            $id_orders = 0;
+          } else {
+            $id_orders = (int)$r[0]['id'];
+          }
+
+          $id_webtriggers = (int)$r[0]['id_webtriggers'];
+
+          if ($file_order) {
+            cl($r[0]['file_original'].' started', VERBOSE_DEBUG);
+          } else {
+            cl($id_orders.' started', VERBOSE_DEBUG);
+          }
+
+          if ($file_order) {
+            # change ownership, otherwise no write access
+            chown($r[0]['file'], 'root');
+
+            $newname = $r[0]['file_original'].'.runs';
+            if (!rename($r[0]['file'], $newname)) {
+              cl('Failed renaming '.$r[0]['file'].' to '.$newname, VERBOSE_ERROR);
+              die(1);
+            }
+            $r[0]['file'] = $newname;
+          }
+          # mark order as started
+          if (!$file_order) {
+            $sql = 'UPDATE webtrigger_orders SET status='.STATUS_STARTED.', started="'.dbres($link, date('Y-m-d H:i:s')).'" WHERE id="'.dbres($link, $id_orders).'"';
+            cl($id_orders.' SQL: '.$sql, VERBOSE_DEBUG_DEEP);
+            db_query($link, $sql);
+          }
+
+          # find action index
+          $action_index = false;
+          foreach ($actions as $k => $v) {
+            if ((int)$v['id'] === $id_webtriggers) {
+              $action_index = $k;
+              break;
+            }
+          }
+
+          # check if it does not exist then take next
+          if ($action_index === false) {
+            if ($file_order) {
+              $newname = $r[0]['file_original'].'.error_no_trigger';
+              if (!rename($r[0]['file'], $newname)) {
+                cl('Failed renaming '.$r[0]['file'].' to '.$newname, VERBOSE_ERROR);
+                die(1);
+              }
+            } else {
+              # mark order as nonexistent
+              $sql = 'UPDATE webtrigger_orders SET status='.STATUS_ERROR_TRIGGER_NOT_CONFIGURED.' WHERE id="'.dbres($link, $id_orders).'"';
+              cl($id_orders.' SQL: '.$sql, VERBOSE_DEBUG_DEEP);
+              db_query($link, $sql);
+              cl($id_orders.' error, trigger not configured', VERBOSE_ERROR);
+            }
+            continue;
+          }
+
+          # run the action
+          if ($file_order) {
+            cl($r[0]['file_original'].' run "'.$actions[$action_index]['action'].'"', VERBOSE_INFO);
+          } else {
+            cl($id_orders.' run "'.$actions[$action_index]['action'].'"', VERBOSE_INFO);
+          }
+
+          exec($actions[$action_index]['action'], $o, $returncode);
+
+          if ($file_order) {
+            cl($r[0]['file_original'].' end '.$returncode.' "'.implode("\n", $o).'"', VERBOSE_INFO);
+          } else {
+            cl($id_orders.' end '.$returncode.' "'.implode("\n", $o).'"', VERBOSE_INFO);
+          }
+
+          if ($file_order) {
+              $newname = $r[0]['file_original'].'.ended';
+              if (!rename($r[0]['file'], $newname)) {
+                cl('Failed renaming '.$r[0]['file'].' to '.$newname, VERBOSE_ERROR);
+                die(1);
+              }
+              $r[0]['file'] = $newname;
+
+              file_put_contents($r[0]['file'],
+                'ended: '.date('Y-m-d H:i:s')."\n".
+                'returncode: '.$returncode."\n".
+                'status: '. ($returncode === 0 ? STATUS_ENDED : STATUS_ERROR_BAD_EXIT_CODE)."\n".
+                'output: '. implode("\n", $o)."\n"
+              );
+          } else {
+            $iu = dbpua($link, array(
+              'ended' => date('Y-m-d H:i:s'),
+              'output' => implode("\n", $o),
+              'returncode' => $returncode,
+              'status' => $returncode === 0 ? STATUS_ENDED : STATUS_ERROR_BAD_EXIT_CODE
+            ));
+
+            $sql = 'UPDATE webtrigger_orders SET '.implode(',', $iu).' WHERE id="'.dbres($link, $id_orders).'"';
+            cl($id_orders.' SQL: '.$sql, VERBOSE_DEBUG_DEEP);
+            db_query($link, $sql);
+          }
+          continue;
+        }
+
+        break;
+
+      } while(1);
+      break;
     case 'r':
     case 'run':
     case 'run-order-file':
@@ -143,7 +319,7 @@ Parameters:
         } while(count(glob($name.'*')));
         $name .= 'queued';
         touch($name);
-
+        chmod($name, 0666);
       } else {
         $iu = dbpia($link, array(
           'id_webtriggers' => $id_webtriggers,
@@ -235,165 +411,5 @@ Parameters:
       break;
   }
 }
-
-function cmp($a, $b) {
-  if ($a['created'] == $b['created']) {
-    return 0;
-  }
-  return ($a['created'] < $b['created']) ? -1 : 1;
-}
-
-check_setup_files();
-
-$actions = get_actions();
-
-do {
-  cl('Checking for a queued order', VERBOSE_DEBUG);
-
-  # get one order
-  $sql = 'SELECT * FROM webtrigger_orders WHERE status='.STATUS_QUEUED.' ORDER BY created LIMIT 1';
-  cl('SQL: '.$sql, VERBOSE_DEBUG_DEEP);
-  $r = db_query($link, $sql);
-  cl('Rows: '.count($r), VERBOSE_DEBUG_DEEP);
-
-  if (ORDER_FILES_PATH !== false && dir(ORDER_FILES_PATH)) {
-
-    $files = scandir(ORDER_FILES_PATH);
-    if ($files === false) {
-      cl('Error, order files path could not be checked: '.ORDER_FILES_PATH, VERBOSE_ERROR);
-      die(1);
-    }
-
-    foreach ($files as $file) {
-
-      # webtriggers.order.id_webtriggers.tmpcode[.status]
-      if (strpos($file, 'webtriggers.order.') !== 0) continue;
-
-      $parts = explode('.', $file);
-      if (!is_numeric($parts[2]) ||
-        isset($parts[4]) && $parts[count($parts) - 1] !== 'queued'
-      ) {
-        continue;
-      }
-
-      array_pop($parts);
-
-      $r[] = array(
-        'id_webtriggers' => (int)$parts[2],
-        'created' => filemtime(ORDER_FILES_PATH.$file),
-        'file' => ORDER_FILES_PATH.$file,
-        'file_original' => ORDER_FILES_PATH.implode('.', $parts)
-      );
-    }
-    usort($r, "cmp");
-  }
-
-  if (count($r)) {
-
-    $file_order = isset($r[0]['file']);
-
-    if ($file_order) {
-      $id_orders = 0;
-    } else {
-      $id_orders = (int)$r[0]['id'];
-    }
-
-    $id_webtriggers = (int)$r[0]['id_webtriggers'];
-
-    if ($file_order) {
-      cl($r[0]['file_original'].' started', VERBOSE_DEBUG);
-    } else {
-      cl($id_orders.' started', VERBOSE_DEBUG);
-    }
-
-    if ($file_order) {
-      $newname = $r[0]['file_original'].'.runs';
-      if (!rename($r[0]['file'], $newname)) {
-        cl('Failed renaming '.$r[0]['file'].' to '.$newname, VERBOSE_ERROR);
-        die(1);
-      }
-      $r[0]['file'] = $newname;
-    }
-    # mark order as started
-    if (!$file_order) {
-      $sql = 'UPDATE webtrigger_orders SET status='.STATUS_STARTED.', started="'.dbres($link, date('Y-m-d H:i:s')).'" WHERE id="'.dbres($link, $id_orders).'"';
-      cl($id_orders.' SQL: '.$sql, VERBOSE_DEBUG_DEEP);
-      db_query($link, $sql);
-    }
-
-    # find action index
-    $action_index = false;
-    foreach ($actions as $k => $v) {
-      if ((int)$v['id'] === $id_webtriggers) {
-        $action_index = $k;
-        break;
-      }
-    }
-
-    # check if it does not exist then take next
-    if ($action_index === false) {
-      if ($file_order) {
-        $newname = $r[0]['file_original'].'.error_no_trigger';
-        if (!rename($r[0]['file'], $newname)) {
-          cl('Failed renaming '.$r[0]['file'].' to '.$newname, VERBOSE_ERROR);
-          die(1);
-        }
-      } else {
-        # mark order as nonexistent
-        $sql = 'UPDATE webtrigger_orders SET status='.STATUS_ERROR_TRIGGER_NOT_CONFIGURED.' WHERE id="'.dbres($link, $id_orders).'"';
-        cl($id_orders.' SQL: '.$sql, VERBOSE_DEBUG_DEEP);
-        db_query($link, $sql);
-        cl($id_orders.' error, trigger not configured', VERBOSE_ERROR);
-      }
-      continue;
-    }
-
-    # run the action
-    if ($file_order) {
-      cl($r[0]['file_original'].' run "'.$actions[$action_index]['action'].'"', VERBOSE_INFO);
-    } else {
-      cl($id_orders.' run "'.$actions[$action_index]['action'].'"', VERBOSE_INFO);
-    }
-
-    exec($actions[$action_index]['action'], $o, $returncode);
-
-    if ($file_order) {
-      cl($r[0]['file_original'].' end '.$returncode.' "'.implode("\n", $o).'"', VERBOSE_INFO);
-    } else {
-      cl($id_orders.' end '.$returncode.' "'.implode("\n", $o).'"', VERBOSE_INFO);
-    }
-
-    if ($file_order) {
-        $newname = $r[0]['file_original'].'.ended';
-        if (!rename($r[0]['file'], $newname)) {
-          cl('Failed renaming '.$r[0]['file'].' to '.$newname, VERBOSE_ERROR);
-          die(1);
-        }
-        $r[0]['file'] = $newname;
-
-        file_put_contents($r[0]['file'],
-          'ended: '.date('Y-m-d H:i:s')."\n".
-          'returncode: '.$returncode."\n".
-          'status: '. ($returncode === 0 ? STATUS_ENDED : STATUS_ERROR_BAD_EXIT_CODE)."\n".
-          'output: '. implode("\n", $o)."\n"
-        );
-    } else {
-      $iu = dbpua($link, array(
-        'ended' => date('Y-m-d H:i:s'),
-        'output' => implode("\n", $o),
-        'returncode' => $returncode,
-        'status' => $returncode === 0 ? STATUS_ENDED : STATUS_ERROR_BAD_EXIT_CODE
-      ));
-
-      $sql = 'UPDATE webtrigger_orders SET '.implode(',', $iu).' WHERE id="'.dbres($link, $id_orders).'"';
-      cl($id_orders.' SQL: '.$sql, VERBOSE_DEBUG_DEEP);
-      db_query($link, $sql);
-    }
-    continue;
-  }
-
-  break;
-
-} while(1);
 
 ?>
