@@ -11,7 +11,7 @@ if (php_sapi_name() !== 'cli') {
 
 require_once(dirname(__FILE__).DIRECTORY_SEPARATOR.'include'.DIRECTORY_SEPARATOR.'functions.php');
 
-foreach (getopt('hl:pr:stuv::', array(
+foreach (getopt('hl:pr:stuwv::', array(
   'help', 'list-actions', 'list-orders', 'process-queue',
   'run:', 'run-order-file:', 'setup', 'verbose::'
 )) as $k => $v) {
@@ -59,6 +59,8 @@ Parameters:
   -t               Get trigger file.
 
   -u               Update trigger file to trigger queue processing.
+
+  -w               Start watchers.
 
   -v[vvv],         Show detailed information, must precede other parameters
   --verbose[vvv]   to take effect as they run in the order they are written,
@@ -121,11 +123,8 @@ Parameters:
     case 'p':
     case 'process-queue':
 
-      $currentuser = posix_getpwuid(posix_geteuid());
-      $currentuser = $currentuser['name'];
-      if ($currentuser !== 'root') {
-        echo 'Root is required to process queue.'."\n";
-      }
+      require_root('process order queue');
+
 
       function cmp($a, $b) {
         if ($a['created'] == $b['created']) {
@@ -335,6 +334,9 @@ Parameters:
 
       die();
     case 's':
+
+      require_root('run setup');
+
       cl('Setting upp config file '.CONFIGFILE.' and trigger file '.TRIGGERFILE, VERBOSE_INFO, false);
       # setup trigger file
       touch(TRIGGERFILE);
@@ -385,12 +387,25 @@ Parameters:
       chown(CONFIGFILE, 'root');
       chgrp(CONFIGFILE, 'root');
       chmod(CONFIGFILE, 0644);
-      die();
+      break;
     case 't':
       echo TRIGGERFILE;
       die();
     case 'u':
       file_put_contents(TRIGGERFILE, time());
+      break;
+    case 'w':
+      # start the watcher
+
+      require_root('start the watcher');
+
+      $cmd = DIRECTORY_SEPARATOR.'bin'.DIRECTORY_SEPARATOR.'bash '
+        .dirname(__FILE__).DIRECTORY_SEPARATOR.'include'.DIRECTORY_SEPARATOR
+        .'onchange.sh '.'"'.TRIGGERFILE.'" "'.DIRECTORY_SEPARATOR.'usr'
+        .DIRECTORY_SEPARATOR.'bin'.DIRECTORY_SEPARATOR.'php '
+        .dirname(__FILE__).DIRECTORY_SEPARATOR.'webtriggers.php -p" &';
+
+      proc_close(proc_open($cmd, array(), $unused));
       break;
     case 'v': # be verbose
     case 'verbose':

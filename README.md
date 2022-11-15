@@ -24,9 +24,8 @@ include/database.sql - Database schema
 include/onchange.sh - File system watcher
 include/setup-example.php - Example file of database setup
 include/setup.php - Example file of database setup
-index.php - Web page to be visited by a web browser.
-webtriggers.php - Order fetcher and action webtriggers
-watch.trigger.sh - File trigger starter
+index.php - Web page to be visited by a web browser
+webtriggers.php - Command line interface (cli), order fetcher, action runner
 
 ## Getting Started
 
@@ -94,7 +93,8 @@ include/setup.php.
 ```
 
 Run this to write a configuration file to /etc/dptools/webtriggers and
-trigger file to /var/cache/webtriggers.trigger:
+to write a trigger file to /var/cache/webtriggers.trigger that is updated
+by the interface and the cli:
 
 ```
 php webtriggers.php -vs
@@ -104,10 +104,10 @@ Open the configuration file at /etc/dptools/webtriggers and setup your actions
 in this file.
 
 Add the following to /etc/rc.local or similar file that runs on system start to
-start the watcher for the trigger file that is updated by the web interface:
+setup trigger file, start watcher and process queue on startup:
 
 ```
-/bin/bash /<path-to-project-root-directory>/watch.trigger.sh
+/usr/bin/php /<path-to-project-root-directory>/webtriggers.php -s -w -p
 ```
 
 The watcher calls webtriggers.php which checks the database for orders to run when
@@ -117,6 +117,12 @@ the trigger file is updated.
 
 Visit the web page at https://<server>/webtriggers/, and click on the buttons
 on the desired action to run it.
+
+Run /usr/bin/php /<path-to-project-root-directory>/webtriggers.php -r "Action name" as
+a regular user to run actions using the cli.
+
+Run /usr/bin/php /<path-to-project-root-directory>/webtriggers.php -h for a list of
+more commands.
 
 ## Authors
 

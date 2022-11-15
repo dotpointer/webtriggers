@@ -154,4 +154,13 @@ function get_actions() {
   return $actions;
 }
 
+function require_root($text) {
+  $currentuser = posix_getpwuid(posix_geteuid());
+  $currentuser = $currentuser['name'];
+  if ($currentuser !== 'root') {
+    cl('Root is required to '.$text.'.', VERBOSE_ERROR, false);
+    die(1);
+  }
+}
+
 ?>
