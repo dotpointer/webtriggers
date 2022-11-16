@@ -78,7 +78,7 @@ Parameters:
         }
       }
 
-      if ($k === 'list-orders' || $k === 'l' && $v === 'o') {
+      if (DATABASE_NAME !== false && $k === 'list-orders' || $k === 'l' && $v === 'o') {
         $actions = get_actions();
 
         $sql = 'SELECT * FROM webtrigger_orders ORDER BY created DESC LIMIT 10';
@@ -140,11 +140,15 @@ Parameters:
       do {
         cl('Checking for a queued order', VERBOSE_DEBUG);
 
-        # get one order
-        $sql = 'SELECT * FROM webtrigger_orders WHERE status='.STATUS_QUEUED.' ORDER BY created LIMIT 1';
-        cl('SQL: '.$sql, VERBOSE_DEBUG_DEEP);
-        $r = db_query($link, $sql);
-        cl('Rows: '.count($r), VERBOSE_DEBUG_DEEP);
+        $r = array();
+
+        if (DATABASE_NAME !== false) {
+          # get one order
+          $sql = 'SELECT * FROM webtrigger_orders WHERE status='.STATUS_QUEUED.' ORDER BY created LIMIT 1';
+          cl('SQL: '.$sql, VERBOSE_DEBUG_DEEP);
+          $r = db_query($link, $sql);
+          cl('Rows: '.count($r), VERBOSE_DEBUG_DEEP);
+        }
 
         if (ORDER_FILES_PATH !== false && dir(ORDER_FILES_PATH)) {
 
@@ -322,6 +326,10 @@ Parameters:
         touch($name);
         chmod($name, 0666);
       } else {
+        if (!strlen(DATABASE_NAME)) {
+          cl('Error, database name has not been set.', VERBOSE_ERROR, false);
+          die(1);
+        }
         $iu = dbpia($link, array(
           'id_webtriggers' => $id_webtriggers,
           'created' => date('Y-m-d H:i:s')

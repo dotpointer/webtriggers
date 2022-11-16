@@ -52,6 +52,9 @@ Setup the nginx web server with PHP-FPM support and MariaDB/MySQL and inotify-to
 In short: apt-get install nginx mariadb-server php-fpm php-mysqli inotify-tools
 and then configure nginx, PHP and setup a user in MariaDB.
 
+It is also possible to run webtriggers without a web server and a database
+by using --run-order-files to create file based orders.
+
 ### Installing
 
 Head to the nginx document root and clone the repository:
@@ -61,6 +64,8 @@ cd /var/www/html
 git clone https://gitlab.com/dotpointer/webtriggers.git
 cd webtriggers/
 ```
+
+For web based database driven orders:
 
 Import database structure, located in include/database.sql
 
@@ -86,6 +91,8 @@ GRANT ALL PRIVILEGES ON webtriggers.* TO 'www'@'localhost';
 FLUSH PRIVILEGES;
 ```
 
+For web based database driven orders and cli:
+
 Fill in the database configuration in:
 
 ```
@@ -94,7 +101,7 @@ include/setup.php.
 
 Run this to write a configuration file to /etc/dptools/webtriggers and
 to write a trigger file to /var/cache/webtriggers.trigger that is updated
-by the interface and the cli:
+by the web page and the cli:
 
 ```
 php webtriggers.php -vs
@@ -115,10 +122,17 @@ the trigger file is updated.
 
 ## Usage
 
+For web based database driven orders:
+
 Visit the web page at https://<server>/webtriggers/, and click on the buttons
 on the desired action to run it.
 
 Run /usr/bin/php /<path-to-project-root-directory>/webtriggers.php -r "Action name" as
+a regular user to run actions using the cli.
+
+For file based orders:
+
+Run /usr/bin/php /<path-to-project-root-directory>/webtriggers.php -run-order-file "Action name" as
 a regular user to run actions using the cli.
 
 Run /usr/bin/php /<path-to-project-root-directory>/webtriggers.php -h for a list of

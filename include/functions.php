@@ -46,22 +46,23 @@ require_once(dirname(__FILE__).DIRECTORY_SEPARATOR.'base.translate.php');
 
 $verbosity_cli = VERBOSITY_CLI;
 
-$link = db_connect();
+$link = strlen(DATABASE_NAME) ? db_connect() : false;
 # mysql_set_charset('utf8', $link);
 
 $errors = array();
 
-if (!function_exists('shutdown_function')) {
-  # a function to run when the script shutdown
-  function shutdown_function($link) {
-    if ($link) {
-      db_close($link);
+if ($link) {
+  if (!function_exists('shutdown_function')) {
+    # a function to run when the script shutdown
+    function shutdown_function($link) {
+      if ($link) {
+        db_close($link);
+      }
     }
+    # register a shutdown function
   }
+  register_shutdown_function('shutdown_function', $link);
 }
-
-# register a shutdown function
-register_shutdown_function('shutdown_function', $link);
 
 function check_setup_files() {
 

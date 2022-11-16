@@ -7,10 +7,13 @@
 # web server username to be granted access to trigger file
 define('USERNAME_HTTP', 'www-data');
 
-# database setup, fill this in
+# database setup, fill this in for web based orders:
 define('DATABASE_HOST', 'localhost');
 define('DATABASE_USERNAME', 'www');
 define('DATABASE_PASSWORD', 'www');
+
+# database setup, fill in database name or set to false to 
+# disable web based orders:
 define('DATABASE_NAME', 'webtriggers');
 
 # not implemented

@@ -19,6 +19,15 @@ $id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : false;
 switch ($action) {
   case 'list':
 
+    if (!strlen(DATABASE_NAME)) {
+      if ($format === 'json') {
+        die(json_encode(array(
+          'status' => false
+        )));
+      }
+      die();
+    }
+
     header('Content-Type: application/json');
     $sql = 'SELECT * FROM webtrigger_orders ORDER BY created DESC LIMIT 10';
     $queue = db_query($link, $sql);
@@ -39,6 +48,15 @@ switch ($action) {
 
     break;
   case 'trigger':
+
+    if (!strlen(DATABASE_NAME)) {
+      if ($format === 'json') {
+        die(json_encode(array(
+          'status' => false
+        )));
+      }
+      die();
+    }
 
     $id_webtriggers = false;
     $action_index = false;
@@ -73,8 +91,10 @@ switch ($action) {
     break;
 }
 
-$sql = 'SELECT * FROM webtrigger_orders ORDER BY created DESC LIMIT 10';
-$queue = db_query($link, $sql);
+if (strlen(DATABASE_NAME)) {
+  $sql = 'SELECT * FROM webtrigger_orders ORDER BY created DESC LIMIT 10';
+  $queue = db_query($link, $sql);
+}
 
 ?><!DOCTYPE html>
 <html>
@@ -97,13 +117,16 @@ $queue = db_query($link, $sql);
   <body>
     <h1><a href="?">Webtriggers</a></h1>
 <?php
-switch ($action) {
-  case 'trigger':
+
+if (strlen(DATABASE_NAME)) {
+
+  switch ($action) {
+    case 'trigger':
 ?>
   <p><?php echo t('Queued action').' '.$actions[$action_index]['name'] ?>.</p>
 <?php
-    break;
-}
+      break;
+  }
 ?>
     <table>
       <caption><?php echo t('Actions') ?></caption>
@@ -115,7 +138,7 @@ switch ($action) {
       </thead>
       <tbody>
 <?php
-foreach ($actions as $k => $action) {
+  foreach ($actions as $k => $action) {
 ?>
         <tr>
           <td><?php echo $action['name'] ?></td>
@@ -129,7 +152,7 @@ foreach ($actions as $k => $action) {
         </tr>
       </tbody>
 <?php
-}
+  }
 ?>
     </table>
     <br>
@@ -146,14 +169,14 @@ foreach ($actions as $k => $action) {
       </thead>
       <tbody>
 <?php
-foreach ($queue as $k => $v) {
-  $action_index = false;
-  foreach ($actions as $ak => $av) {
-    if ((int)$av['id'] === (int)$v['id_webtriggers']) {
-      $action_index = $ak;
-      break;
+  foreach ($queue as $k => $v) {
+    $action_index = false;
+    foreach ($actions as $ak => $av) {
+      if ((int)$av['id'] === (int)$v['id_webtriggers']) {
+        $action_index = $ak;
+        break;
+      }
     }
-  }
 ?>
         <tr id="queuerow<?php echo $v['id']?>">
           <td class="actionname"><?php echo $action_index !== false ? $actions[$action_index]['name'] : ''; ?></td>
@@ -171,9 +194,16 @@ foreach ($queue as $k => $v) {
           <td class="ended extra"><?php echo $v['ended']; ?></td>
         </tr>
 <?php
-}
+  }
 ?>
       </tbody>
     </table>
+<?php
+} else {
+?>
+    <p>Database driven web trigger orders are disabled, no database has been set.</p>
+<?php
+}
+?>
   </body>
 </html>
