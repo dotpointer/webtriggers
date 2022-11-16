@@ -31,4 +31,7 @@ define('ORDER_FILES_PATH', false);
 
 # trigger file - must exist
 define('TRIGGERFILE', '/var/cache/webtriggers.trigger');
+
+# enable web interface, set to false to disable
+define('WEB_ENABLED', true);
 ?>

@@ -19,29 +19,73 @@ $id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : false;
 switch ($action) {
   case 'list':
 
-    if (!strlen(DATABASE_NAME)) {
-      if ($format === 'json') {
-        die(json_encode(array(
-          'status' => false
-        )));
-      }
-      die();
+    $queue = array();
+    header('Content-Type: application/json');
+
+    if (strlen(DATABASE_NAME)) {
+      $sql = 'SELECT * FROM webtrigger_orders ORDER BY created DESC LIMIT 10';
+      $queue = db_query($link, $sql);
     }
 
-    header('Content-Type: application/json');
-    $sql = 'SELECT * FROM webtrigger_orders ORDER BY created DESC LIMIT 10';
-    $queue = db_query($link, $sql);
+    if (ORDER_FILES_PATH !== false && dir(ORDER_FILES_PATH)) {
+
+      $files = scandir(ORDER_FILES_PATH);
+      if ($files === false) {
+        die(json_encode_formatted(array(
+          'status' => false,
+          'error' => t('Error, order files path could not be checked:').' '.ORDER_FILES_PATH
+        )));
+        die(1);
+      }
+
+      foreach ($files as $file) {
+
+        # webtriggers.order.id_webtriggers.tmpcode[.status]
+        if (strpos($file, 'webtriggers.order.') !== 0) continue;
+
+        $parts = explode('.', $file);
+        if (!is_numeric($parts[2]) ) {
+          continue;
+        }
+        $status = STATUS_ERROR_UNKNOWN;
+        if (isset($parts[4]) && isset($parts[count($parts) - 1])) {
+          $statuspart = $parts[count($parts) - 1];
+          foreach ($statuses_files as $sfk => $sfv) {
+            if ($sfv === $statuspart) {
+              $status = $sfk;
+              break;
+            }
+          }
+        }
+
+        array_pop($parts);
+
+        $queue[] = array(
+          'id' => -filemtime(ORDER_FILES_PATH.$file),
+          'id_webtriggers' => (int)$parts[2],
+          'created' => date('Y-m-d H:i:s', filemtime(ORDER_FILES_PATH.$file)),
+          'file' => ORDER_FILES_PATH.$file,
+          'file_original' => ORDER_FILES_PATH.implode('.', $parts),
+          'status' => $status
+        );
+      }
+      usort($queue, 'compare_orders');
+    }
 
     foreach ($queue as $rowindex => $row) {
       # to int
       foreach (array('id', 'id_webtriggers', 'returncode', 'status') as $columnname) {
-        $queue[$rowindex][$columnname] = (int)$row[$columnname];
+        if (isset($row[$columnname])) {
+          $queue[$rowindex][$columnname] = (int)$row[$columnname];
+        }
       }
     }
-
+    $queue = array_reverse($queue);
+    $queue = array_slice($queue, 0, 10);
     $queue = array_reverse($queue);
 
-    die(json_encode(array(
+
+    die(json_encode_formatted(array(
       'status' => true,
       'data' => $queue
     )));
@@ -51,7 +95,7 @@ switch ($action) {
 
     if (!strlen(DATABASE_NAME)) {
       if ($format === 'json') {
-        die(json_encode(array(
+        die(json_encode_formatted(array(
           'status' => false
         )));
       }
@@ -84,16 +128,11 @@ switch ($action) {
     file_put_contents(TRIGGERFILE, time());
 
     if ($format === 'json') {
-      die(json_encode(array(
+      die(json_encode_formatted(array(
         'status' => true
       )));
     }
     break;
-}
-
-if (strlen(DATABASE_NAME)) {
-  $sql = 'SELECT * FROM webtrigger_orders ORDER BY created DESC LIMIT 10';
-  $queue = db_query($link, $sql);
 }
 
 ?><!DOCTYPE html>
@@ -105,9 +144,9 @@ if (strlen(DATABASE_NAME)) {
     <script src="include/jquery-3.6.1.min.js"></script>
     <script>
       window.wt = window.wt == null ? {} : window.wt;
-      window.wt.actions = <?php echo json_encode($actions); ?>;
-      window.wt.msg = <?php echo json_encode(get_translation_texts(), true); ?>;
-      window.wt.statuses = <?php echo json_encode($statuses); ?>;
+      window.wt.actions = <?php echo json_encode_formatted($actions); ?>;
+      window.wt.msg = <?php echo json_encode_formatted(get_translation_texts(), true); ?>;
+      window.wt.statuses = <?php echo json_encode_formatted($statuses); ?>;
       window.wt.timeouts = {
         list: null
       };
@@ -118,7 +157,7 @@ if (strlen(DATABASE_NAME)) {
     <h1><a href="?">Webtriggers</a></h1>
 <?php
 
-if (strlen(DATABASE_NAME)) {
+if (WEB_ENABLED) {
 
   switch ($action) {
     case 'trigger':
@@ -157,7 +196,7 @@ if (strlen(DATABASE_NAME)) {
     </table>
     <br>
     <table id="queue">
-      <caption><?php echo t('Queue - latest').' '.count($queue) ?></caption>
+      <caption><?php echo t('Queue - latest') ?></caption>
       <thead>
         <tr class="header">
             <th><?php echo t('Name')?></th>
@@ -168,40 +207,12 @@ if (strlen(DATABASE_NAME)) {
         </tr>
       </thead>
       <tbody>
-<?php
-  foreach ($queue as $k => $v) {
-    $action_index = false;
-    foreach ($actions as $ak => $av) {
-      if ((int)$av['id'] === (int)$v['id_webtriggers']) {
-        $action_index = $ak;
-        break;
-      }
-    }
-?>
-        <tr id="queuerow<?php echo $v['id']?>">
-          <td class="actionname"><?php echo $action_index !== false ? $actions[$action_index]['name'] : ''; ?></td>
-          <td class="status"><?php
-            echo t($statuses[$v['status']]);
-            if ((int)$v['status'] < 0) {
-              ?><br><?php
-              echo t('Return code').': '.$v['returncode'];
-              ?><br><?php
-              echo t('Output').': '.$v['output'];
-            }
-        ?></td>
-          <td class="created extra"><?php echo $v['created']; ?></td>
-          <td class="started extra"><?php echo $v['started']; ?></td>
-          <td class="ended extra"><?php echo $v['ended']; ?></td>
-        </tr>
-<?php
-  }
-?>
       </tbody>
     </table>
 <?php
 } else {
 ?>
-    <p>Database driven web trigger orders are disabled, no database has been set.</p>
+    <p>Web interface is disabled.</p>
 <?php
 }
 ?>

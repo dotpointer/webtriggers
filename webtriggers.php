@@ -78,20 +78,76 @@ Parameters:
         }
       }
 
-      if (DATABASE_NAME !== false && $k === 'list-orders' || $k === 'l' && $v === 'o') {
+      if ($k === 'list-orders' || $k === 'l' && $v === 'o') {
         $actions = get_actions();
 
-        $sql = 'SELECT * FROM webtrigger_orders ORDER BY created DESC LIMIT 10';
-        $queue = db_query($link, $sql);
+
+        if (strlen(DATABASE_NAME)) {
+          $sql = 'SELECT * FROM webtrigger_orders ORDER BY created DESC LIMIT 10';
+          $queue = db_query($link, $sql);
+        }
+
+        if (ORDER_FILES_PATH !== false && dir(ORDER_FILES_PATH)) {
+
+          $files = scandir(ORDER_FILES_PATH);
+          if ($files === false) {
+            die(json_encode_formatted(array(
+              'status' => false,
+              'error' => t('Error, order files path could not be checked:').' '.ORDER_FILES_PATH
+            )));
+            die(1);
+          }
+
+          foreach ($files as $file) {
+
+            # webtriggers.order.id_webtriggers.tmpcode[.status]
+            if (strpos($file, 'webtriggers.order.') !== 0) continue;
+
+            $parts = explode('.', $file);
+            if (!is_numeric($parts[2]) ) {
+              continue;
+            }
+            $status = STATUS_ERROR_UNKNOWN;
+            if (isset($parts[4]) && isset($parts[count($parts) - 1])) {
+              $statuspart = $parts[count($parts) - 1];
+              foreach ($statuses_files as $sfk => $sfv) {
+                if ($sfv === $statuspart) {
+                  $status = $sfk;
+                  break;
+                }
+              }
+            }
+
+            array_pop($parts);
+
+            $queue[] = array(
+              'id' => -filemtime(ORDER_FILES_PATH.$file),
+              'id_webtriggers' => (int)$parts[2],
+              'created' => date('Y-m-d H:i:s', filemtime(ORDER_FILES_PATH.$file)),
+              'file' => ORDER_FILES_PATH.$file,
+              'file_original' => ORDER_FILES_PATH.implode('.', $parts),
+              'returncode' => '?',
+              'status' => $status,
+              'started' => '0000-00-00 00:00:00',
+              'ended' => '0000-00-00 00:00:00'
+            );
+          }
+          usort($queue, 'compare_orders');
+        }
 
         foreach ($queue as $rowindex => $row) {
           # to int
           foreach (array('id', 'id_webtriggers', 'returncode', 'status') as $columnname) {
-            $queue[$rowindex][$columnname] = (int)$row[$columnname];
+            if (isset($row[$columnname])) {
+              $queue[$rowindex][$columnname] = (int)$row[$columnname];
+            }
           }
         }
-
         $queue = array_reverse($queue);
+        $queue = array_slice($queue, 0, 10);
+        $queue = array_reverse($queue);
+
+
         echo 'id created started ended name status return-code'."\n";
         foreach ($queue as $k => $v) {
           $action_index = false;
@@ -124,14 +180,6 @@ Parameters:
     case 'process-queue':
 
       require_root('process order queue');
-
-
-      function cmp($a, $b) {
-        if ($a['created'] == $b['created']) {
-          return 0;
-        }
-        return ($a['created'] < $b['created']) ? -1 : 1;
-      }
 
       check_setup_files();
 
@@ -174,12 +222,12 @@ Parameters:
 
             $r[] = array(
               'id_webtriggers' => (int)$parts[2],
-              'created' => filemtime(ORDER_FILES_PATH.$file),
+              'created' => date('Y-m-d H:i:s', filemtime(ORDER_FILES_PATH.$file)),
               'file' => ORDER_FILES_PATH.$file,
               'file_original' => ORDER_FILES_PATH.implode('.', $parts)
             );
           }
-          usort($r, "cmp");
+          usort($r, 'compare_orders');
         }
 
         if (count($r)) {
@@ -204,7 +252,7 @@ Parameters:
             # change ownership, otherwise no write access
             chown($r[0]['file'], 'root');
 
-            $newname = $r[0]['file_original'].'.runs';
+            $newname = $r[0]['file_original'].'.started';
             if (!rename($r[0]['file'], $newname)) {
               cl('Failed renaming '.$r[0]['file'].' to '.$newname, VERBOSE_ERROR);
               die(1);
@@ -268,12 +316,12 @@ Parameters:
               }
               $r[0]['file'] = $newname;
 
-              file_put_contents($r[0]['file'],
+              /*file_put_contents($r[0]['file'],
                 'ended: '.date('Y-m-d H:i:s')."\n".
                 'returncode: '.$returncode."\n".
                 'status: '. ($returncode === 0 ? STATUS_ENDED : STATUS_ERROR_BAD_EXIT_CODE)."\n".
                 'output: '. implode("\n", $o)."\n"
-              );
+              );*/
           } else {
             $iu = dbpua($link, array(
               'ended' => date('Y-m-d H:i:s'),

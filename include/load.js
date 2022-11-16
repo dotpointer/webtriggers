@@ -77,8 +77,10 @@ $(function() {
 
         let queuerow = $('#queuerow' + data.data[i].id);
 
-        if (!queuerow.length) {
 
+
+        if (!queuerow.length) {
+          console.log('SAKNAS: #queuerow' + data.data[i].id);
           while ($('#queue tbody tr').length > 9) {
             $('#queue tbody tr').last().remove();
           }

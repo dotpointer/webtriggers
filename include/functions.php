@@ -7,6 +7,7 @@ session_start();
 
 define('SITE_SHORTNAME', 'webtriggers');
 
+define('STATUS_ERROR_UNKNOWN', -3);
 define('STATUS_ERROR_BAD_EXIT_CODE', -2);
 define('STATUS_ERROR_TRIGGER_NOT_CONFIGURED', -1);
 define('STATUS_QUEUED', 0);
@@ -15,12 +16,23 @@ define('STATUS_ENDED', 2);
 define('STATUS_ABORTED', 3);
 
 $statuses = array(
+  STATUS_ERROR_UNKNOWN => 'Error, unknown',
   STATUS_ERROR_TRIGGER_NOT_CONFIGURED => 'Error, not found in configuration file',
   STATUS_ERROR_BAD_EXIT_CODE => 'Error, bad exit code',
   STATUS_QUEUED => 'Queued',
   STATUS_STARTED => 'Started',
   STATUS_ENDED => 'Ended',
   STATUS_ABORTED => 'Aborted'
+);
+
+$statuses_files = array(
+  STATUS_ERROR_UNKNOWN => 'error_unknown',
+  STATUS_ERROR_TRIGGER_NOT_CONFIGURED => 'error_no_trigger',
+  STATUS_ERROR_BAD_EXIT_CODE => 'error_bad_exit_code',
+  STATUS_QUEUED => 'queued',
+  STATUS_STARTED => 'started',
+  STATUS_ENDED => 'ended',
+  STATUS_ABORTED => 'aborted'
 );
 
 # verbosity
@@ -133,6 +145,13 @@ function cl($s, $level=VERBOSE_ERROR, $log_to_logfile=true) {
   return true;
 }
 
+function compare_orders($a, $b) {
+  if ($a['created'] == $b['created']) {
+    return 0;
+  }
+  return ($a['created'] < $b['created']) ? -1 : 1;
+}
+
 function get_actions() {
   $actions = file_get_contents(CONFIGFILE);
 
@@ -153,6 +172,12 @@ function get_actions() {
     die(1);
   }
   return $actions;
+}
+
+function json_encode_formatted($output) {
+  $json_indented_by_4 = json_encode($output, JSON_UNESCAPED_SLASHES|JSON_PRETTY_PRINT);
+  $json_indented_by_2 = preg_replace('/^(  +?)\\1(?=[^ ])/m', '$1', $json_indented_by_4);
+  return $json_indented_by_2;
 }
 
 function require_root($text) {
