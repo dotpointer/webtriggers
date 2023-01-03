@@ -91,6 +91,52 @@ switch ($action) {
     )));
 
     break;
+  case 'abort':
+    if (!strlen(DATABASE_NAME)) {
+      if ($format === 'json') {
+        die(json_encode_formatted(array(
+          'status' => false
+        )));
+      }
+      die();
+    }
+
+    $id_webtriggers = false;
+    $action_index = false;
+    foreach ($actions as $k => $v) {
+      if ((int)$v['id'] === $id) {
+        $id_webtriggers = $id;
+        $action_index = $k;
+        break;
+      }
+    }
+
+    if ($id_webtriggers === false) {
+      header('Content-Type: text/plain');
+      cl('Error, action with id '.$id.' not found in configuration file.', VERBOSE_ERROR, false);
+      die(1);
+    }
+
+    $iu = dbpua($link, array(
+      'status' => STATUS_ABORTED,
+      'started' => date('Y-m-d H:i:s'),
+      'ended' => date('Y-m-d H:i:s')
+    ));
+    $sql = '
+      UPDATE webtrigger_orders
+      SET '.implode($iu, ', ').'
+      WHERE id="'.dbres($link, $id_webtriggers).' AND status="'.dbres($link, STATUS_QUEUED).'"
+    ';
+    cl('SQL: '.$sql, VERBOSE_DEBUG_DEEP, false);
+    $r_insert = db_query($link, $sql);
+    file_put_contents(TRIGGERFILE, time());
+
+    if ($format === 'json') {
+      die(json_encode_formatted(array(
+        'status' => true
+      )));
+    }
+    break;
   case 'trigger':
 
     if (!strlen(DATABASE_NAME)) {
@@ -204,6 +250,7 @@ if (WEB_ENABLED) {
             <th class="extra"><?php echo t('Created')?></th>
             <th class="extra"><?php echo t('Start')?></th>
             <th class="extra"><?php echo t('End')?></th>
+            <th><?php echo t('Actions')?></th>
         </tr>
       </thead>
       <tbody>

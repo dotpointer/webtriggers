@@ -11,6 +11,17 @@ if (php_sapi_name() !== 'cli') {
 
 require_once(dirname(__FILE__).DIRECTORY_SEPARATOR.'include'.DIRECTORY_SEPARATOR.'functions.php');
 
+$is_startup = false;
+
+foreach (getopt('w') as $k => $v) {
+  switch ($k) {
+    case 'w':
+      $is_startup = true;
+      break;
+  }
+}
+
+
 foreach (getopt('hl:pr:stuwv::', array(
   'help', 'list-actions', 'list-orders', 'process-queue',
   'run:', 'run-order-file:', 'setup', 'verbose::'
@@ -293,6 +304,27 @@ Parameters:
             continue;
           }
 
+          # check if this is startup and it should be aborted
+          if ($is_startup &&
+            isset($actions[$action_index]['abort_on_startup']) &&
+            $actions[$action_index]['abort_on_startup']
+          ) {
+            if ($file_order) {
+              $newname = $r[0]['file_original'].'.aborted';
+              if (!rename($r[0]['file'], $newname)) {
+                cl('Failed renaming '.$r[0]['file'].' to '.$newname, VERBOSE_ERROR);
+                die(1);
+              }
+            } else {
+              # mark order as nonexistent
+              $sql = 'UPDATE webtrigger_orders SET status='.STATUS_ABORTED.' WHERE id="'.dbres($link, $id_orders).'"';
+              cl($id_orders.' SQL: '.$sql, VERBOSE_DEBUG_DEEP);
+              db_query($link, $sql);
+              cl($id_orders.' aborted on startup', VERBOSE_DEBUG);
+            }
+            continue;
+          }
+
           # run the action
           if ($file_order) {
             cl($r[0]['file_original'].' run "'.$actions[$action_index]['action'].'"', VERBOSE_INFO);
@@ -390,6 +422,7 @@ Parameters:
 
       die();
     case 's':
+    case 'setup':
 
       require_root('run setup');
 
@@ -406,12 +439,14 @@ Parameters:
           array(
             'id' => 1,
             'name' => 'Write date to /tmp/webtriggers.example',
-            'action' => 'date >> /tmp/webtriggers.example'
+            'action' => 'date >> /tmp/webtriggers.example',
+            'abort_on_startup' => 0
           ),
           array(
             'id' => 2,
             'name' => 'Write users to /tmp/webtriggers.example',
-            'action' => 'users >> /tmp/webtriggers.example'
+            'action' => 'users >> /tmp/webtriggers.example',
+            'abort_on_startup' => 0
           )
 
         );

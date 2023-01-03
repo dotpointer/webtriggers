@@ -80,7 +80,6 @@ $(function() {
 
 
         if (!queuerow.length) {
-          console.log('SAKNAS: #queuerow' + data.data[i].id);
           while ($('#queue tbody tr').length > 9) {
             $('#queue tbody tr').last().remove();
           }
@@ -117,6 +116,23 @@ $(function() {
                   .addClass('extra')
                   .text(data.data[i].ended)
               )
+              .append(
+                $('<td>')
+                  .append(
+                    data.data[i].status === 0 &&
+                    data.data[i].id >= 0
+                    ?
+                      $('<button>')
+                        .text('Abort')
+                        .bind('click', function() {
+                          let id = $(this).parents('tr:first').attr('id').replace('queuerow', '');
+                          $.get('?action=abort&id=' + id + '&format=json');
+                          $(this).attr('disabled', true);
+                        })
+                    :
+                    ''
+                  )
+              )
           )
 
         } else {
@@ -130,6 +146,9 @@ $(function() {
             if (td.html() !== data.data[i][col]) {
               td.html(data.data[i][col]);
             }
+          }
+          if (data.data[i].status !== 0 && queuerow.find('button')) {
+            queuerow.find('button').remove();
           }
         }
       }
