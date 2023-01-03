@@ -1,9 +1,10 @@
 <?php
 
-# webtriggers translation file for swedish
+# webtriggers translation file for Swedish
 
 # changelog
 # 2021-11-07 03:32:00
+# 2022-12-03 20:23:00 - abort
 
 # store this into translations
 $translations['languages'][] = array(
@@ -11,6 +12,7 @@ $translations['languages'][] = array(
     'sv-SE'
   ),
   'content' => array(
+    array('Abort', 'Avbryt'),
     array('Aborted', 'Avbruten'),
     array('Actions', 'Händelser'),
     array('Created', 'Skapad'),

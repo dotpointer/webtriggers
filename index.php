@@ -2,6 +2,7 @@
 
 # changelog
 # 2021-11-07 02:48:00
+# 2023-01-03 20:23:00 - abort
 
 require_once(dirname(__FILE__).DIRECTORY_SEPARATOR.'include'.DIRECTORY_SEPARATOR.'functions.php');
 
@@ -15,6 +16,8 @@ $a = isset($_REQUEST['a']) ? $_REQUEST['a'] : false;
 $action = isset($_REQUEST['action']) ? $_REQUEST['action'] : $a;
 $format = isset($_REQUEST['format']) ? $_REQUEST['format'] : false;
 $id = isset($_REQUEST['id']) ? (int)$_REQUEST['id'] : false;
+$id_orders = isset($_REQUEST['id_orders']) ? (int)$_REQUEST['id_orders'] : false;
+
 
 switch ($action) {
   case 'list':
@@ -101,22 +104,6 @@ switch ($action) {
       die();
     }
 
-    $id_webtriggers = false;
-    $action_index = false;
-    foreach ($actions as $k => $v) {
-      if ((int)$v['id'] === $id) {
-        $id_webtriggers = $id;
-        $action_index = $k;
-        break;
-      }
-    }
-
-    if ($id_webtriggers === false) {
-      header('Content-Type: text/plain');
-      cl('Error, action with id '.$id.' not found in configuration file.', VERBOSE_ERROR, false);
-      die(1);
-    }
-
     $iu = dbpua($link, array(
       'status' => STATUS_ABORTED,
       'started' => date('Y-m-d H:i:s'),
@@ -124,8 +111,10 @@ switch ($action) {
     ));
     $sql = '
       UPDATE webtrigger_orders
-      SET '.implode($iu, ', ').'
-      WHERE id="'.dbres($link, $id_webtriggers).' AND status="'.dbres($link, STATUS_QUEUED).'"
+      SET '.implode(', ', $iu).'
+      WHERE
+        id="'.dbres($link, $id_orders).'" AND
+        status="'.dbres($link, STATUS_QUEUED).'"
     ';
     cl('SQL: '.$sql, VERBOSE_DEBUG_DEEP, false);
     $r_insert = db_query($link, $sql);
@@ -250,7 +239,7 @@ if (WEB_ENABLED) {
             <th class="extra"><?php echo t('Created')?></th>
             <th class="extra"><?php echo t('Start')?></th>
             <th class="extra"><?php echo t('End')?></th>
-            <th><?php echo t('Actions')?></th>
+            <th><?php echo t('Manage')?></th>
         </tr>
       </thead>
       <tbody>

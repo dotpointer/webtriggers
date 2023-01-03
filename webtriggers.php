@@ -3,6 +3,7 @@
 
 # changelog
 # 2021-11-07 02:48:00
+# 2023-01-03 20:23:00 - abort
 
 # require cli usage only
 if (php_sapi_name() !== 'cli') {
@@ -272,7 +273,12 @@ Parameters:
           }
           # mark order as started
           if (!$file_order) {
-            $sql = 'UPDATE webtrigger_orders SET status='.STATUS_STARTED.', started="'.dbres($link, date('Y-m-d H:i:s')).'" WHERE id="'.dbres($link, $id_orders).'"';
+            $sql = '
+              UPDATE webtrigger_orders
+              SET
+                status='.STATUS_STARTED.',
+                started="'.dbres($link, date('Y-m-d H:i:s')).'"
+              WHERE id="'.dbres($link, $id_orders).'"';
             cl($id_orders.' SQL: '.$sql, VERBOSE_DEBUG_DEEP);
             db_query($link, $sql);
           }
@@ -316,8 +322,16 @@ Parameters:
                 die(1);
               }
             } else {
-              # mark order as nonexistent
-              $sql = 'UPDATE webtrigger_orders SET status='.STATUS_ABORTED.' WHERE id="'.dbres($link, $id_orders).'"';
+              # mark order as aborted
+              $iu = dbpua($link, array(
+                    'status' => STATUS_ABORTED,
+                    'started' => date('Y-m-d H:i:s'),
+                    'ended' => date('Y-m-d H:i:s')
+                  ));
+              $sql = '
+                UPDATE webtrigger_orders
+                SET '.implode(', ', $iu).'
+                WHERE id="'.dbres($link, $id_orders).'"';
               cl($id_orders.' SQL: '.$sql, VERBOSE_DEBUG_DEEP);
               db_query($link, $sql);
               cl($id_orders.' aborted on startup', VERBOSE_DEBUG);

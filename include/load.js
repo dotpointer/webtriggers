@@ -126,7 +126,7 @@ $(function() {
                         .text('Abort')
                         .bind('click', function() {
                           let id = $(this).parents('tr:first').attr('id').replace('queuerow', '');
-                          $.get('?action=abort&id=' + id + '&format=json');
+                          $.getJSON('?action=abort&id_orders=' + id + '&format=json');
                           $(this).attr('disabled', true);
                         })
                     :
@@ -147,8 +147,9 @@ $(function() {
               td.html(data.data[i][col]);
             }
           }
-          if (data.data[i].status !== 0 && queuerow.find('button')) {
-            queuerow.find('button').remove();
+          if (data.data[i].status !== 0 && $(queuerow[0]).find('button').length) {
+            $(queuerow[0]).find('button').remove();
+            console.log($(queuerow[0]).find('button'));
           }
         }
       }
